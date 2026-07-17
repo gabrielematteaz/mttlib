@@ -82,7 +82,29 @@ namespace mttlib {
       std::ranges::copy_n(characters, count, buffer);
       buffer[count] = kNullTerminator < CharacterType >;
 
-      return TemplateString(characters, count, buffer_size);
+      return TemplateString(buffer, count, buffer_size);
+    }
+
+    // assert(first != nullptr && last != nullptr && first <= last)
+    static std::optional < TemplateString > Construct(const CharacterType *first,
+        const CharacterType *last, bool exact) noexcept {
+      assert(first != nullptr && last != nullptr && first <= last);
+
+      return Construct(first, last - first, exact);
+    }
+
+    static std::optional < TemplateString > Construct(const TemplateString &other,
+        bool exact) noexcept {
+      int buffer_size = exact ? other.length_ + 1 : other.buffer_size_;
+      CharacterType *buffer = new(std::nothrow) CharacterType[buffer_size];
+
+      if (buffer == nullptr) {
+        return std::nullopt;
+      }
+
+      std::ranges::copy_n(other.buffer_, other.length_ + 1, buffer);
+
+      return TemplateString(buffer, other.length_, buffer_size);
     }
 
     TemplateString() noexcept {
@@ -115,7 +137,7 @@ namespace mttlib {
     }
 
     operator TemplateCharactersSpan < CharacterType > () const noexcept {
-      return { buffer_, size_ };
+      return { buffer_, length_ };
     }
 
     const CharacterType *buffer() const noexcept {
@@ -222,6 +244,25 @@ namespace mttlib {
       return true;
     }
 
+    // assert(offset >= 0 && offset <= length() && first != nullptr &&
+    // last != nullptr && first <= last)
+    bool Insert(int offset, const CharacterType *first, const CharacterType *last)
+        noexcept {
+      assert(offset >= 0 && offset <= length_ && first != nullptr &&
+          last != nullptr && first <= last);
+
+      int count = static_cast < int > (last - first);
+
+      return Insert(offset, first, count);
+    }
+
+    // assert(offset >= 0 && offset <= length())
+    bool Insert(int offset, const TemplateString &other) noexcept {
+      assert(offset >= 0 && offset <= length_);
+
+      return Insert(offset, other.buffer_, other.length_);
+    }
+
     // assert(c_string != nullptr)
     bool Append(const CharacterType *c_string) noexcept {
       assert(c_string != nullptr);
@@ -271,6 +312,38 @@ namespace mttlib {
 
       std::ranges::copy_n(characters, count, buffer_ + length_);
       buffer_[new_length] = kNullTerminator < CharacterType >;
+      length_ = new_length;
+
+      return true;
+    }
+
+    // assert(first != nullptr && last != nullptr && first <= last)
+    bool Append(const CharacterType *first, const CharacterType *last) noexcept {
+      assert(first != nullptr && last != nullptr && first <= last);
+
+      int count = static_cast < int > (last - first);
+
+      return Append(first, count);
+    }
+
+    bool Append(const TemplateString &other) noexcept {
+      int new_length = length_ + other.length_;
+      int buffer_size = AlignToBlockSize(new_length);
+
+      if (buffer_size > buffer_size_) {
+        CharacterType *buffer = new(std::nothrow) CharacterType[buffer_size];
+
+        if (buffer == nullptr) {
+          return false;
+        }
+
+        std::ranges::copy_n(buffer_, length_, buffer);
+        Destroy();
+        buffer_ = buffer;
+        buffer_size_ = buffer_size_;
+      }
+
+      std::ranges::copy_n(other.buffer_, other.length_ + 1, buffer_ + length_);
       length_ = new_length;
 
       return true;
