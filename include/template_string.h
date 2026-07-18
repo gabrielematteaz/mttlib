@@ -11,6 +11,30 @@
 namespace mttlib {
   template < typename CharacterType >
   class TemplateString {
+    static constexpr int kBlockSize = 16;
+
+    static inline CharacterType kFallback[1]{ kNullTerminator < CharacterType > };
+
+    static int AlignToBlockSize(int value) noexcept {
+      return (value / kBlockSize + 1) * kBlockSize;
+    }
+
+    CharacterType *buffer_;
+    int length_;
+    int buffer_size_;
+
+    TemplateString(CharacterType *buffer, int length, int buffer_size) noexcept {
+      buffer_ = buffer;
+      length_ = length;
+      buffer_size_ = buffer_size;
+    }
+
+    void Destroy() noexcept {
+      if (buffer_ != kFallback) {
+        delete[] buffer_;
+      }
+    }
+
   public:
     TemplateString(const TemplateString &) = delete;
     TemplateString &operator = (const TemplateString &) = delete;
@@ -369,31 +393,6 @@ namespace mttlib {
     void Clear() noexcept {
       buffer_[0] = kNullTerminator < CharacterType >;
       length_ = 0;
-    }
-
-  private:
-    static constexpr int kBlockSize = 16;
-
-    static inline CharacterType kFallback[1]{ kNullTerminator < CharacterType > };
-
-    static int AlignToBlockSize(int value) noexcept {
-      return (value / kBlockSize + 1) * kBlockSize;
-    }
-
-    CharacterType *buffer_;
-    int length_;
-    int buffer_size_;
-
-    TemplateString(CharacterType *buffer, int length, int buffer_size) noexcept {
-      buffer_ = buffer;
-      length_ = length;
-      buffer_size_ = buffer_size;
-    }
-
-    void Destroy() noexcept {
-      if (buffer_ != kFallback) {
-        delete[] buffer_;
-      }
     }
   };
 

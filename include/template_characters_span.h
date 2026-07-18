@@ -29,6 +29,11 @@ namespace mttlib {
 
   template < typename CharacterType >
   class TemplateCharactersSpan {
+    static constexpr CharacterType kFallback[1]{ kNullTerminator < CharacterType > };
+
+    const CharacterType *pointer_;
+    int size_;
+
   public:
     TemplateCharactersSpan() noexcept {
       pointer_ = kFallback;
@@ -36,7 +41,7 @@ namespace mttlib {
     }
 
     // assert(c_string != nullptr)
-    TemplateCharactersSpan(const CharacterType *c_string) noexcept {
+    explicit TemplateCharactersSpan(const CharacterType *c_string) noexcept {
       assert(c_string != nullptr);
 
       pointer_ = c_string;
@@ -58,12 +63,6 @@ namespace mttlib {
     int size() const noexcept {
       return size_;
     }
-
-  private:
-    static constexpr CharacterType kFallback[1]{ kNullTerminator < CharacterType > };
-
-    const CharacterType *pointer_;
-    int size_;
   };
 
   using CharactersSpan = TemplateCharactersSpan < char >;

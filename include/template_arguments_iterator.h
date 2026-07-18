@@ -21,6 +21,24 @@ namespace mttlib {
     using StringType = TemplateString < CharacterType >;
     using CharactersSpanType = TemplateCharactersSpan < CharacterType >;
 
+    static constexpr CharacterType kCharacterTabulation = 0x09;
+    static constexpr CharacterType kSpace = 0x20;
+    static constexpr CharacterType kQuotationMark = 0x22;
+    static constexpr CharacterType kApostrophe = 0x27;
+    static constexpr CharacterType kReverseSolidus = 0x5C;
+
+    StringType command_line_;
+    StringType argument_;
+    int offset_;
+
+    TemplateArgumentsIterator(StringType &&command_line) noexcept :
+      command_line_(std::move(command_line)),
+      argument_(),
+      offset_(0)
+    {
+
+    }
+
   public:
     TemplateArgumentsIterator(const TemplateArgumentsIterator &) = delete;
     TemplateArgumentsIterator(TemplateArgumentsIterator &&) = default;
@@ -166,25 +184,6 @@ namespace mttlib {
       argument_.Append(first, current - skip);
 
       return ArgumentsIteratorResult::kSuccess;
-    }
-
-  private:
-    static constexpr CharacterType kCharacterTabulation = 0x09;
-    static constexpr CharacterType kSpace = 0x20;
-    static constexpr CharacterType kQuotationMark = 0x22;
-    static constexpr CharacterType kApostrophe = 0x27;
-    static constexpr CharacterType kReverseSolidus = 0x5C;
-
-    StringType command_line_;
-    StringType argument_;
-    int offset_;
-
-    TemplateArgumentsIterator(StringType &&command_line) noexcept :
-      command_line_(std::move(command_line)),
-      argument_(),
-      offset_(0)
-    {
-
     }
   };
 
