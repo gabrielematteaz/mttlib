@@ -72,11 +72,11 @@ namespace mttlib {
       return TemplateArgumentsIterator(std::move(*command_line_copy));
     }
 
-    CharactersSpanType command_line() const noexcept {
+    const StringType &command_line() const noexcept {
       return command_line_;
     }
 
-    CharactersSpanType argument() const noexcept {
+    const StringType &argument() const noexcept {
       return argument_;
     }
 
