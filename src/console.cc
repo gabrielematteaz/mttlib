@@ -3,20 +3,20 @@
 #include <Windows.h>
 
 namespace mttlib {
-  std::optional < Console > Console::Construct() noexcept {
+  Box < Console > Console::Construct() noexcept {
     HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
 
     if (input == INVALID_HANDLE_VALUE || input == NULL) {
-      return std::nullopt;
+      return { };
     }
 
     HANDLE output = GetStdHandle(STD_OUTPUT_HANDLE);
 
     if (output == INVALID_HANDLE_VALUE || output == NULL) {
-      return std::nullopt;
+      return { };
     }
 
-    return Console(input, output);
+    return Box < Console > (kBoxConstruct, input, output);
   }
 
   ConsoleResult Console::ReadLine(String &string) noexcept {

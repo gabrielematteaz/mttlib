@@ -12,14 +12,14 @@ namespace mttlib {
     delete[] buffer_;
   }
 
-  std::optional < FileInputStream > FileInputStream::Construct(const char *path)
+  Box < FileInputStream > FileInputStream::Construct(const char *path)
       noexcept {
     assert(path != nullptr);
 
     char *buffer = new(std::nothrow) char[kBufferSize];
 
     if (buffer == nullptr) {
-      return std::nullopt;
+      return { };
     }
 
     HANDLE handle = CreateFileA(path, GENERIC_READ, 0,
@@ -28,20 +28,20 @@ namespace mttlib {
     if (handle == INVALID_HANDLE_VALUE) {
       delete[] buffer;
 
-      return std::nullopt;
+      return { };
     }
 
-    return FileInputStream(handle, buffer);
+    return Box < FileInputStream > (kBoxConstruct, handle, buffer);
   }
 
-  std::optional < FileInputStream > FileInputStream::Construct(const wchar_t *path)
+  Box < FileInputStream > FileInputStream::Construct(const wchar_t *path)
       noexcept {
     assert(path != nullptr);
 
     char *buffer = new(std::nothrow) char[kBufferSize];
 
     if (buffer == nullptr) {
-      return std::nullopt;
+      return { };
     }
 
     HANDLE handle = CreateFileW(path, GENERIC_READ, 0,
@@ -50,10 +50,10 @@ namespace mttlib {
     if (handle == INVALID_HANDLE_VALUE) {
       delete[] buffer;
 
-      return std::nullopt;
+      return { };
     }
 
-    return FileInputStream(handle, buffer);
+    return Box < FileInputStream > (kBoxConstruct, handle, buffer);
   }
 
   FileInputStream::FileInputStream(FileInputStream &&other) noexcept {

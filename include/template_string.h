@@ -4,13 +4,15 @@
 #include <algorithm>
 #include <cassert>
 #include <new>
-#include <optional>
 
+#include "box.h"
 #include "template_characters_span.h"
 
 namespace mttlib {
   template < typename CharacterType >
   class TemplateString {
+    friend class Box < TemplateString >;
+
     static constexpr int kBlockSize = 16;
 
     static inline CharacterType kFallback[1]{ kNullTerminator < CharacterType > };
@@ -40,23 +42,24 @@ namespace mttlib {
     TemplateString &operator = (const TemplateString &) = delete;
 
     /// assert(buffer_size >= 0)
-    static std::optional < TemplateString > Construct(int buffer_size) noexcept {
+    static Box < TemplateString > Construct(int buffer_size) noexcept {
       assert(buffer_size >= 0);
 
       int aligned_buffer_size = AlignToBlockSize(buffer_size);
       CharacterType *buffer = new(std::nothrow) CharacterType[aligned_buffer_size];
 
       if (buffer == nullptr) {
-        return std::nullopt;
+        return { };
       }
 
       buffer[0] = kNullTerminator < CharacterType >;
 
-      return TemplateString(buffer, 0, aligned_buffer_size);
+      return Box < TemplateString > (kBoxConstruct,
+          buffer, 0, aligned_buffer_size);
     }
 
     // assert(count >= 0)
-    static std::optional < TemplateString > Construct(CharacterType character,
+    static Box < TemplateString > Construct(CharacterType character,
         int count) noexcept {
       assert(count >= 0);
 
@@ -64,17 +67,18 @@ namespace mttlib {
       CharacterType *buffer = new(std::nothrow) CharacterType[buffer_size];
 
       if (buffer == nullptr) {
-        return std::nullopt;
+        return { };
       }
 
       std::ranges::fill_n(buffer, count, character);
       buffer[count] = kNullTerminator < CharacterType >;
 
-      return TemplateString(buffer, count, buffer_size);
+      return Box < TemplateString > (kBoxConstruct,
+          buffer, count, buffer_size);
     }
 
     // assert(c_string != nullptr)
-    static std::optional < TemplateString > Construct(const CharacterType *c_string,
+    static Box < TemplateString > Construct(const CharacterType *c_string,
         bool exact) noexcept {
       assert(c_string != nullptr);
 
@@ -83,16 +87,17 @@ namespace mttlib {
       CharacterType *buffer = new(std::nothrow) CharacterType[buffer_size];
 
       if (buffer == nullptr) {
-        return std::nullopt;
+        return { };
       }
 
       std::ranges::copy_n(c_string, length + 1, buffer);
 
-      return TemplateString(buffer, length, buffer_size);
+      return Box < TemplateString > (kBoxConstruct,
+          buffer, length, buffer_size);
     }
 
     // assert(characters != nullptr && count >= 0)
-    static std::optional < TemplateString > Construct(const CharacterType *characters,
+    static Box < TemplateString > Construct(const CharacterType *characters,
         int count, bool exact) noexcept {
       assert(characters != nullptr && count >= 0);
 
@@ -100,35 +105,37 @@ namespace mttlib {
       CharacterType *buffer = new(std::nothrow) CharacterType[buffer_size];
 
       if (buffer == nullptr) {
-        return std::nullopt;
+        return { };
       }
 
       std::ranges::copy_n(characters, count, buffer);
       buffer[count] = kNullTerminator < CharacterType >;
 
-      return TemplateString(buffer, count, buffer_size);
+      return Box < TemplateString > (kBoxConstruct,
+          buffer, count, buffer_size);
     }
 
     // assert(first != nullptr && last != nullptr && first <= last)
-    static std::optional < TemplateString > Construct(const CharacterType *first,
+    static Box < TemplateString > Construct(const CharacterType *first,
         const CharacterType *last, bool exact) noexcept {
       assert(first != nullptr && last != nullptr && first <= last);
 
       return Construct(first, last - first, exact);
     }
 
-    static std::optional < TemplateString > Construct(const TemplateString &other,
+    static Box < TemplateString > Construct(const TemplateString &other,
         bool exact) noexcept {
       int buffer_size = exact ? other.length_ + 1 : other.buffer_size_;
       CharacterType *buffer = new(std::nothrow) CharacterType[buffer_size];
 
       if (buffer == nullptr) {
-        return std::nullopt;
+        return { };
       }
 
       std::ranges::copy_n(other.buffer_, other.length_ + 1, buffer);
 
-      return TemplateString(buffer, other.length_, buffer_size);
+      return Box < TemplateString > (kBoxConstruct,
+          buffer, other.length_, buffer_size);
     }
 
     TemplateString() noexcept {

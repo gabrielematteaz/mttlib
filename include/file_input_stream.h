@@ -2,7 +2,8 @@
 #define MTTLIB_INCLUDE_FILE_INPUT_STREAM_H_
 
 #include <cstdint>
-#include <optional>
+
+#include "box.h"
 
 namespace mttlib {
   enum class SeekPosition {
@@ -12,6 +13,8 @@ namespace mttlib {
   };
 
   class FileInputStream {
+    friend class Box < FileInputStream >;
+
     static constexpr int kBufferSize = 4096;
 
     void *handle_;
@@ -32,9 +35,9 @@ namespace mttlib {
 
   public:
     // assert(path != nullptr)
-    static std::optional < FileInputStream > Construct(const char *path) noexcept;
+    static Box < FileInputStream > Construct(const char *path) noexcept;
     // assert(path != nullptr)
-    static std::optional < FileInputStream > Construct(const wchar_t *path) noexcept;
+    static Box < FileInputStream > Construct(const wchar_t *path) noexcept;
     FileInputStream(const FileInputStream &) = delete;
     FileInputStream(FileInputStream &&other) noexcept;
     FileInputStream &operator = (const FileInputStream &) = delete;

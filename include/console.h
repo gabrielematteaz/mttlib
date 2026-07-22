@@ -2,8 +2,8 @@
 #define MTTLIB_INCLUDE_CONSOLE_H_
 
 #include <cassert>
-#include <optional>
 
+#include "box.h"
 #include "template_string.h"
 
 namespace mttlib {
@@ -15,6 +15,8 @@ namespace mttlib {
   };
 
   class Console {
+    friend class Box < Console >;
+
     static constexpr int kBufferSize = 128;
     static constexpr char kLineFeed[1]{ '\n' };
     static constexpr wchar_t kWideLineFeed[1]{ L'\n' };
@@ -28,7 +30,7 @@ namespace mttlib {
     }
 
   public:
-    static std::optional < Console > Construct() noexcept;
+    static Box < Console > Construct() noexcept;
     ConsoleResult ReadLine(String &string) noexcept;
     ConsoleResult ReadLine(WideString &string) noexcept;
     int Write(CharactersSpan characters_span, bool append_line_feed) const noexcept;

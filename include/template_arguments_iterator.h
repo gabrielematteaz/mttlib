@@ -2,9 +2,9 @@
 #define MTTLIB_INCLUDE_TEMPLATE_ARGUMENTS_ITERATOR_H_
 
 #include <cassert>
-#include <optional>
 #include <utility>
 
+#include "box.h"
 #include "template_characters_span.h"
 #include "template_string.h"
 
@@ -46,7 +46,7 @@ namespace mttlib {
     TemplateArgumentsIterator &operator = (TemplateArgumentsIterator &&) = default;
 
     // assert(command_line != nullptr)
-    static std::optional < TemplateArgumentsIterator > Construct(
+    static Box < TemplateArgumentsIterator > Construct(
         const CharacterType *command_line) noexcept {
       assert(command_line != nullptr);
 
@@ -54,22 +54,24 @@ namespace mttlib {
           StringType::Construct(command_line, true);
 
       if (command_line_copy.has_value() == false) {
-        return std::nullopt;
+        return { };
       }
 
-      return TemplateArgumentsIterator(std::move(*command_line_copy));
+      return Box < TemplateArgumentsIterator > (kBoxConstruct,
+          std::move(*command_line_copy));
     }
 
-    static std::optional < TemplateArgumentsIterator > Construct(
+    static Box < TemplateArgumentsIterator > Construct(
         const StringType &command_line) noexcept {
       std::optional < StringType > command_line_copy =
           StringType::Construct(command_line, true);
 
       if (command_line_copy.has_value() == false) {
-        return std::nullopt;
+        return { };
       }
 
-      return TemplateArgumentsIterator(std::move(*command_line_copy));
+      return Box < TemplateArgumentsIterator > (kBoxConstruct,
+          std::move(*command_line_copy));
     }
 
     const StringType &command_line() const noexcept {
