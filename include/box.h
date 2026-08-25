@@ -12,146 +12,148 @@ namespace mttlib {
   template < typename ValueType >
   class Box {
     union {
-      ValueType this_value;
+      ValueType value_;
     };
 
-    bool this_has_value;
+    bool has_value_;
 
   public:
     Box() noexcept {
-      this_has_value = false;
+      has_value_ = false;
     }
 
     template < typename... ConstructorParametersType >
     explicit Box(BoxConstruct const&, ConstructorParametersType &&... constructor_arguments) noexcept {
       static_assert(std::is_nothrow_constructible_v < ValueType, ConstructorParametersType... >);
 
-      new(&this_value) ValueType(std::forward < ConstructorParametersType > (constructor_arguments)...);
-      this_has_value = true;
+      new(&value_) ValueType(std::forward < ConstructorParametersType > (constructor_arguments)...);
+      has_value_ = true;
     }
 
     Box(Box const& other) noexcept {
       static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
 
-      if (other.this_has_value) {
-        new(&this_value) ValueType(other.this_value);
+      if (other.has_value_) {
+        new(&value_) ValueType(other.value_);
       }
 
-      this_has_value = other.this_has_value;
+      has_value_ = other.has_value_;
     }
 
     Box(Box && other) noexcept {
       static_assert(std::is_nothrow_move_constructible_v < ValueType >);
 
-      if (other.this_has_value) {
-        new(&this_value) ValueType(std::move(other.this_value));
+      if (other.has_value_) {
+        new(&value_) ValueType(std::move(other.value_));
       }
 
-      this_has_value = other.this_has_value;
-      other.this_has_value = false;
+      has_value_ = other.has_value_;
+      other.has_value_ = false;
     }
 
     ~Box() {
       static_assert(std::is_nothrow_destructible_v < ValueType >);
 
-      if (this_has_value) {
-        this_value.~ValueType();
+      if (has_value_) {
+        value_.~ValueType();
       }
     }
 
     Box & operator = (Box const& other) noexcept {
-      static_assert(std::is_nothrow_copy_assignable_v < ValueType > && std::is_nothrow_destructible_v < ValueType> &&
+      static_assert(std::is_nothrow_copy_assignable_v < ValueType > &&
+          std::is_nothrow_destructible_v < ValueType> &&
           std::is_nothrow_copy_constructible_v < ValueType >);
 
       if (this != &other) {
-        if (this_has_value) {
-          if (other.this_has_value) {
-            this_value = other.this_value;
+        if (has_value_) {
+          if (other.has_value_) {
+            value_ = other.value_;
           }
           else {
-            this_value.~ValueType();
+            value_.~ValueType();
           }
         }
-        else if (other.this_has_value) {
-          new(&this_value) ValueType(other.this_value);
+        else if (other.has_value_) {
+          new(&value_) ValueType(other.value_);
         }
 
-        this_has_value = other.this_has_value;
+        has_value_ = other.has_value_;
       }
 
       return *this;
     }
 
     Box & operator = (Box && other) noexcept {
-      static_assert(std::is_nothrow_move_assignable_v < ValueType > && std::is_nothrow_destructible_v < ValueType> &&
+      static_assert(std::is_nothrow_move_assignable_v < ValueType > &&
+          std::is_nothrow_destructible_v < ValueType> &&
           std::is_nothrow_move_constructible_v < ValueType >);
 
       if (this != &other) {
-        if (this_has_value) {
-          if (other.this_has_value) {
-            this_value = std::move(other.this_value);
+        if (has_value_) {
+          if (other.has_value_) {
+            value_ = std::move(other.value_);
           }
           else {
-            this_value.~ValueType();
+            value_.~ValueType();
           }
         }
-        else if (other.this_has_value) {
-          new(&this_value) ValueType(std::move(other.this_value));
+        else if (other.has_value_) {
+          new(&value_) ValueType(std::move(other.value_));
         }
 
-        this_has_value = other.this_has_value;
-        other.this_has_value = false;
+        has_value_ = other.has_value_;
+        other.has_value_ = false;
       }
 
       return *this;
     }
 
     explicit operator bool() const noexcept {
-      return this_has_value;
+      return has_value_;
     }
 
     ValueType const* operator -> () const noexcept {
-      return &this_value;
+      return &value_;
     }
 
     ValueType * operator -> () noexcept {
-      return &this_value;
+      return &value_;
     }
 
     ValueType const& operator * () const& noexcept {
-      return this_value;
+      return value_;
     }
 
     ValueType & operator * () & noexcept {
-      return this_value;
+      return value_;
     }
 
     ValueType const&& operator * () const&& noexcept {
-      return this_value;
+      return value_;
     }
 
     ValueType && operator * () && noexcept {
-      return this_value;
+      return value_;
     }
 
     bool has_value() const noexcept {
-      return this_has_value;
+      return has_value_;
     }
 
     ValueType const& value() const& noexcept {
-      return this_value;
+      return value_;
     }
 
     ValueType & value() & noexcept {
-      return this_value;
+      return value_;
     }
 
     ValueType const&& value() const&& noexcept {
-      return this_value;
+      return value_;
     }
 
     ValueType && value() && noexcept {
-      return this_value;
+      return value_;
     }
   };
 
