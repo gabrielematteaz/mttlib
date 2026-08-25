@@ -1,0 +1,1 @@
+cl /std:c++latest /utf-8 /Fo:out\debug\ /EHsc /Fd:out\debug\ /Fe:bin\debug\test-1.exe /Iinclude /W4 /Zi /Od /MDd tests\test-1.cc bin\debug\mttlib.lib
