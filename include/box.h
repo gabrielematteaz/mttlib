@@ -1,8 +1,9 @@
 #ifndef MTTLIB_INCLUDE_BOX_H_
 #define MTTLIB_INCLUDE_BOX_H_
 
+#include <new>
 #include <type_traits>
-#include <utility> // std::forward, std::move
+#include <utility>
 
 namespace mttlib {
   struct BoxConstruct {
@@ -16,94 +17,100 @@ namespace mttlib {
     };
 
     bool has_value_;
-
   public:
     Box() noexcept {
       has_value_ = false;
     }
 
-    template < typename... ConstructorParametersType >
+    template < typename ... ConstructorParametersType >
     explicit Box(BoxConstruct const&, ConstructorParametersType &&... constructor_arguments) noexcept {
-      static_assert(std::is_nothrow_constructible_v < ValueType, ConstructorParametersType... >);
+      static_assert(std::is_nothrow_constructible_v < ValueType, ConstructorParametersType ... >);
 
-      new(&value_) ValueType(std::forward < ConstructorParametersType > (constructor_arguments)...);
+      ::new(&value_) ValueType(std::forward < ConstructorParametersType >
+          (constructor_arguments) ...);
       has_value_ = true;
     }
 
     Box(Box const& other) noexcept {
-      static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
-
       if (other.has_value_) {
-        new(&value_) ValueType(other.value_);
+        static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
+
+        ::new(&value_) ValueType(other.value_);
       }
 
       has_value_ = other.has_value_;
     }
 
     Box(Box && other) noexcept {
-      static_assert(std::is_nothrow_move_constructible_v < ValueType >);
-
       if (other.has_value_) {
-        new(&value_) ValueType(std::move(other.value_));
+        static_assert(std::is_nothrow_move_constructible_v < ValueType >);
+
+        ::new(&value_) ValueType(std::move(other.value_));
       }
 
       has_value_ = other.has_value_;
-      other.has_value_ = false;
     }
 
     ~Box() {
-      static_assert(std::is_nothrow_destructible_v < ValueType >);
-
       if (has_value_) {
+        static_assert(std::is_nothrow_destructible_v < ValueType >);
+
         value_.~ValueType();
       }
     }
 
     Box & operator = (Box const& other) noexcept {
-      static_assert(std::is_nothrow_copy_assignable_v < ValueType > &&
-          std::is_nothrow_destructible_v < ValueType> &&
-          std::is_nothrow_copy_constructible_v < ValueType >);
-
-      if (this != &other) {
-        if (has_value_) {
-          if (other.has_value_) {
-            value_ = other.value_;
-          }
-          else {
-            value_.~ValueType();
-          }
-        }
-        else if (other.has_value_) {
-          new(&value_) ValueType(other.value_);
-        }
-
-        has_value_ = other.has_value_;
+      if (this == &other) {
+        return *this;
       }
+
+      if (other.has_value_) {
+        if (has_value_) {
+          static_assert(std::is_nothrow_copy_assignable_v < ValueType >);
+
+          value_ = other.value_;
+        }
+        else {
+          static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
+
+          ::new(&value_) ValueType(other.value_);
+        }
+      }
+      else if (has_value_) {
+        static_assert(std::is_nothrow_destructible_v < ValueType >);
+
+        value_.~ValueType();
+      }
+
+      has_value_ = other.has_value_;
 
       return *this;
     }
 
     Box & operator = (Box && other) noexcept {
-      static_assert(std::is_nothrow_move_assignable_v < ValueType > &&
-          std::is_nothrow_destructible_v < ValueType> &&
-          std::is_nothrow_move_constructible_v < ValueType >);
-
-      if (this != &other) {
-        if (has_value_) {
-          if (other.has_value_) {
-            value_ = std::move(other.value_);
-          }
-          else {
-            value_.~ValueType();
-          }
-        }
-        else if (other.has_value_) {
-          new(&value_) ValueType(std::move(other.value_));
-        }
-
-        has_value_ = other.has_value_;
-        other.has_value_ = false;
+      if (this == &other) {
+        return *this;
       }
+
+      if (other.has_value_) {
+        if (has_value_) {
+          static_assert(std::is_nothrow_move_assignable_v < ValueType >);
+
+          value_ = std::move(other.value_);
+        }
+        else {
+          static_assert(std::is_nothrow_move_constructible_v < ValueType >);
+
+          ::new(&value_) ValueType(std::move(other.value_));
+        }
+      }
+      else if (has_value_) {
+        static_assert(std::is_nothrow_destructible_v < ValueType >);
+
+        value_.~ValueType();
+      }
+
+      has_value_ = other.has_value_;
 
       return *this;
     }
