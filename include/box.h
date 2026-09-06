@@ -31,10 +31,24 @@ namespace mttlib {
       has_value_ = true;
     }
 
-    Box(Box const& other) noexcept {
-      if (other.has_value_) {
-        static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
+    Box(ValueType const& value) noexcept {
+      static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
 
+      ::new(&value_) ValueType(value);
+      has_value_ = true;
+    }
+
+    Box(ValueType && value) noexcept {
+      static_assert(std::is_nothrow_move_constructible_v < ValueType >);
+
+      ::new(&value_) ValueType(std::move(value));
+      has_value_ = true;
+    }
+
+    Box(Box const& other) noexcept {
+      static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
+
+      if (other.has_value_) {
         ::new(&value_) ValueType(other.value_);
       }
 
@@ -42,9 +56,9 @@ namespace mttlib {
     }
 
     Box(Box && other) noexcept {
-      if (other.has_value_) {
-        static_assert(std::is_nothrow_move_constructible_v < ValueType >);
+      static_assert(std::is_nothrow_move_constructible_v < ValueType >);
 
+      if (other.has_value_) {
         ::new(&value_) ValueType(std::move(other.value_));
       }
 
@@ -52,33 +66,63 @@ namespace mttlib {
     }
 
     ~Box() {
-      if (has_value_) {
-        static_assert(std::is_nothrow_destructible_v < ValueType >);
+      static_assert(std::is_nothrow_destructible_v < ValueType >);
 
+      if (has_value_) {
         value_.~ValueType();
       }
     }
 
+    Box & operator = (ValueType const& value) noexcept {
+      static_assert(std::is_nothrow_copy_assignable_v < ValueType > &&
+          std::is_nothrow_copy_constructible_v < ValueType >);
+
+      if (has_value_) {
+        value_ = value;
+      }
+      else {
+        ::new(&value_) ValueType(value);
+      }
+
+      has_value_ = true;
+
+      return *this;
+    }
+
+    Box & operator = (ValueType && value) noexcept {
+      static_assert(std::is_nothrow_move_assignable_v < ValueType > &&
+          std::is_nothrow_move_constructible_v < ValueType >);
+
+      if (has_value_) {
+        value_ = std::move(value);
+      }
+      else {
+        ::new(&value_) ValueType(std::move(value));
+      }
+
+      has_value_ = true;
+
+      return *this;
+    }
+
     Box & operator = (Box const& other) noexcept {
+      static_assert(std::is_nothrow_copy_assignable_v < ValueType > &&
+          std::is_nothrow_copy_constructible_v < ValueType > &&
+          std::is_nothrow_destructible_v < ValueType >);
+
       if (this == &other) {
         return *this;
       }
 
       if (other.has_value_) {
         if (has_value_) {
-          static_assert(std::is_nothrow_copy_assignable_v < ValueType >);
-
           value_ = other.value_;
         }
         else {
-          static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
-
           ::new(&value_) ValueType(other.value_);
         }
       }
       else if (has_value_) {
-        static_assert(std::is_nothrow_destructible_v < ValueType >);
-
         value_.~ValueType();
       }
 
@@ -88,25 +132,23 @@ namespace mttlib {
     }
 
     Box & operator = (Box && other) noexcept {
+      static_assert(std::is_nothrow_move_assignable_v < ValueType > &&
+          std::is_nothrow_move_constructible_v < ValueType> &&
+          std::is_nothrow_destructible_v < ValueType >);
+
       if (this == &other) {
         return *this;
       }
 
       if (other.has_value_) {
         if (has_value_) {
-          static_assert(std::is_nothrow_move_assignable_v < ValueType >);
-
           value_ = std::move(other.value_);
         }
         else {
-          static_assert(std::is_nothrow_move_constructible_v < ValueType >);
-
           ::new(&value_) ValueType(std::move(other.value_));
         }
       }
       else if (has_value_) {
-        static_assert(std::is_nothrow_destructible_v < ValueType >);
-
         value_.~ValueType();
       }
 
