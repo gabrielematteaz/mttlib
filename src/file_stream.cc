@@ -1,4 +1,4 @@
-#include "file_stream.h"
+#include "mttlib\file_stream.h"
 
 #include <Windows.h>
 
@@ -9,6 +9,24 @@
 namespace mttlib {
   Box < FileStream > FileStream::Construct(wchar_t const* path, bool shared) noexcept {
     HANDLE handle = CreateFileW(path, GENERIC_READ, shared ? FILE_SHARE_READ : 0, NULL, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (handle == INVALID_HANDLE_VALUE) {
+      return { };
+    }
+
+    char * buffer = static_cast < char * > (::operator new(kBufferSize * sizeof(*buffer)));
+
+    if (buffer == nullptr) {
+      CloseHandle(handle);
+      return { };
+    }
+
+    return FileStream(handle, buffer);
+  }
+
+  Box < FileStream > FileStream::Construct(char const* path, bool shared) noexcept {
+    HANDLE handle = CreateFileA(path, GENERIC_READ, shared ? FILE_SHARE_READ : 0, NULL, OPEN_EXISTING,
         FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (handle == INVALID_HANDLE_VALUE) {

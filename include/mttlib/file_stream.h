@@ -18,6 +18,7 @@ namespace mttlib {
 
   public:
     static Box < FileStream > Construct(wchar_t const* path, bool shared) noexcept;
+    static Box < FileStream > Construct(char const* path, bool shared) noexcept;
     FileStream() noexcept;
     FileStream(FileStream const&) = delete;
     FileStream(FileStream && other) noexcept;

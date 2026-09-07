@@ -9,7 +9,9 @@ FILE(GLOB TEST_SOURCES "tests/test-1.cc")
 
 ADD_LIBRARY(mttlib STATIC ${MTTP_SOURCES})
 
-TARGET_INCLUDE_DIRECTORIES(mttlib PUBLIC include)
+TARGET_INCLUDE_DIRECTORIES(mttlib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
 
 TARGET_COMPILE_FEATURES(mttlib PUBLIC cxx_std_23) # /std:c++latest
 
@@ -28,11 +30,9 @@ SET_TARGET_PROPERTIES(mttlib PROPERTIES
   OUTPUT_NAME "mttlib"
 )
 
-ADD_CUSTOM_COMMAND(TARGET mttlib POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_LIB_DIR}/include/mttlib"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/include" "${EXPORT_LIB_DIR}/include/mttlib"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${EXPORT_LIB_DIR}/bin/$<CONFIG>"
-  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:mttlib>" "${EXPORT_LIB_DIR}/bin/$<CONFIG>/mttlib.lib"
+EXPORT(TARGETS mttlib
+  NAMESPACE mttlib::
+  FILE "${EXPORT_LIB_DIR}/mttlib-config.cmake"
 )
 
 ADD_EXECUTABLE(test-1 ${TEST_SOURCES})

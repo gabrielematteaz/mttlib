@@ -1,6 +1,7 @@
 #ifndef MTTLIB_INCLUDE_TEMPLATE_STRING_H_
 #define MTTLIB_INCLUDE_TEMPLATE_STRING_H_
 
+#include <algorithm>
 #include <new>
 #include <ranges>
 
@@ -33,6 +34,20 @@ namespace mttlib {
       buffer[0] = kNullTerminator;
 
       return TemplateString(buffer, 0, aligned_buffer_size);
+    }
+
+    static Box < TemplateString > Construct(TemplateCharacterSpan < CharacterType > character_span) noexcept {
+      int aligned_buffer_size = AlignValue(character_span.size());
+      CharacterType * buffer = Allocate(aligned_buffer_size);
+
+      if (buffer == nullptr) {
+        return { };
+      }
+
+      std::ranges::copy_n(character_span.pointer(), character_span.size(), buffer);
+      buffer[character_span.size()] = kNullTerminator;
+
+      return TemplateString(buffer, character_span.size(), aligned_buffer_size);
     }
 
     TemplateString() noexcept {
@@ -153,9 +168,41 @@ namespace mttlib {
       return true;
     }
 
+    bool Append(CharacterType const* characters, int count) noexcept {
+      int new_size = size_ + count;
+      int aligned_new_buffer_size = AlignValue(new_size);
+
+      if (aligned_new_buffer_size > buffer_size_) {
+        CharacterType * new_buffer = Allocate(aligned_new_buffer_size);
+
+        if (new_buffer == nullptr) {
+          return false;
+        }
+
+        std::ranges::copy_n(buffer_, size_, new_buffer);
+        Destroy();
+        buffer_ = new_buffer;
+        buffer_size_ = aligned_new_buffer_size;
+      }
+
+      std::ranges::copy_n(characters, count, buffer_ + size_);
+      buffer_[new_size] = kNullTerminator;
+      size_ = new_size;
+
+      return true;
+    }
+
+    bool Append(CharacterType const* c_string) noexcept {
+      return Append(c_string, CStringLength(c_string));
+    }
+
+    bool Append(TemplateCharacterSpan < CharacterType > character_span) noexcept {
+      return Append(character_span.pointer(), character_span.size());
+    }
+
   private:
     static int AlignValue(int value) noexcept {
-      return (value + kAlignment - 1) / kAlignment;
+      return (value / kAlignment + 1) * kAlignment;
     }
 
     static CharacterType * Allocate(int count) noexcept {
