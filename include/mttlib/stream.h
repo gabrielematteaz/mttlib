@@ -17,6 +17,14 @@ namespace mttlib {
     virtual std::int64_t Tell() noexcept = 0;
     virtual std::int64_t Seek(std::int64_t offset, SeekPosition position) noexcept = 0;
   };
+
+  class WriteStream {
+  public:
+    virtual ~WriteStream() = default;
+    virtual std::int64_t Write(void * buffer, std::int64_t count) noexcept = 0;
+    virtual std::int64_t Tell() noexcept = 0;
+    virtual std::int64_t Seek(std::int64_t offset, SeekPosition position) noexcept = 0;
+  };
 }
 
 #endif

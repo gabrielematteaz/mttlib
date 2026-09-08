@@ -52,6 +52,10 @@ namespace mttlib {
     int size() const noexcept {
       return size_;
     }
+
+    bool empty() const noexcept {
+      return size_ == 0;
+    }
   };
 
   using CharacterSpan = TemplateCharacterSpan < char >;

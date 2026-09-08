@@ -36,6 +36,20 @@ namespace mttlib {
       return TemplateString(buffer, 0, aligned_buffer_size);
     }
 
+    static Box < TemplateString > Construct(CharacterType character, int count) noexcept {
+      int aligned_buffer_size = AlignValue(count);
+      CharacterType * buffer = Allocate(aligned_buffer_size);
+
+      if (buffer == nullptr) {
+        return { };
+      }
+
+      std::ranges::fill_n(buffer, count, character);
+      buffer[count] = kNullTerminator;
+
+      return TemplateString(buffer, count, aligned_buffer_size);
+    }
+
     static Box < TemplateString > Construct(TemplateCharacterSpan < CharacterType > character_span) noexcept {
       int aligned_buffer_size = AlignValue(character_span.size());
       CharacterType * buffer = Allocate(aligned_buffer_size);

@@ -46,6 +46,38 @@ namespace mttlib {
       valid_count_ = 0;
     }
   };
+
+  class WriteFileStream : public WriteStream {
+    void * handle_;
+    std::int64_t handle_offset_;
+
+  public:
+    static Box < WriteFileStream > Construct(wchar_t const* path, bool overwrite, bool shared) noexcept;
+    static Box < WriteFileStream > Construct(char const* path, bool overwrite, bool shared) noexcept;
+    WriteFileStream() noexcept;
+    WriteFileStream(WriteFileStream const&) = delete;
+    WriteFileStream(WriteFileStream && other) noexcept;
+    WriteFileStream & operator = (WriteFileStream const&) = delete;
+    WriteFileStream & operator = (WriteFileStream && other) noexcept;
+    std::int64_t Write(void * buffer, std::int64_t count) noexcept override;
+    std::int64_t Seek(std::int64_t offset, SeekPosition position) noexcept override;
+
+    ~WriteFileStream() {
+      Destroy();
+    }
+
+    std::int64_t Tell() noexcept override {
+      return handle_offset_;
+    }
+
+  private:
+    void Destroy() noexcept;
+
+    WriteFileStream(void * handle) noexcept {
+      handle_ = handle;
+      handle_offset_ = 0;
+    }
+  };
 }
 
 #endif
