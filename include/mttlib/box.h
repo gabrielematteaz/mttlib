@@ -1,212 +1,196 @@
 #ifndef MTTLIB_INCLUDE_BOX_H_
 #define MTTLIB_INCLUDE_BOX_H_
 
-#include <new>
 #include <type_traits>
-#include <utility>
+#include <memory> // std::construct_at, std::destroy_at
+#include <utility> // std::forward, std::move
 
 namespace mttlib {
-  struct BoxConstruct {
-    explicit BoxConstruct() = default;
+  struct box_construct_t {
+    explicit box_construct_t() = default;
   };
 
-  template < typename ValueType >
-  class Box {
+  template < typename value_type >
+  class box {
     union {
-      ValueType value_;
+      value_type m_value;
     };
 
-    bool has_value_;
+    bool m_has_value;
+
   public:
-    Box() noexcept {
-      has_value_ = false;
+    box() noexcept {
+      m_has_value = false;
     }
 
-    template < typename ... ConstructorParametersType >
-    explicit Box(BoxConstruct const&, ConstructorParametersType &&... constructor_arguments) noexcept {
-      static_assert(std::is_nothrow_constructible_v < ValueType, ConstructorParametersType ... >);
-
-      ::new(&value_) ValueType(std::forward < ConstructorParametersType >
-          (constructor_arguments) ...);
-      has_value_ = true;
+    template < typename... parameters_type >
+    requires std::is_nothrow_constructible_v < value_type, parameters_type... >
+    explicit box(box_construct_t const&, parameters_type &&... arguments) noexcept {
+      std::construct_at(&m_value, std::forward < parameters_type > (arguments)...);
+      m_has_value = true;
     }
 
-    Box(ValueType const& value) noexcept {
-      static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
-
-      ::new(&value_) ValueType(value);
-      has_value_ = true;
+    box(value_type const& value) noexcept
+    requires std::is_nothrow_copy_constructible_v < value_type > {
+      std::construct_at(&m_value, value);
+      m_has_value = true;
     }
 
-    Box(ValueType && value) noexcept {
-      static_assert(std::is_nothrow_move_constructible_v < ValueType >);
-
-      ::new(&value_) ValueType(std::move(value));
-      has_value_ = true;
+    box(value_type && other) noexcept
+    requires std::is_nothrow_move_constructible_v < value_type > {
+      std::construct_at(&m_value, std::move(value));
+      m_has_value = true;
     }
 
-    Box(Box const& other) noexcept {
-      static_assert(std::is_nothrow_copy_constructible_v < ValueType >);
-
-      if (other.has_value_) {
-        ::new(&value_) ValueType(other.value_);
+    box(box const& other) noexcept
+    requires std::is_nothrow_copy_constructible_v < value_type > {
+      if (other.m_has_value) {
+        std::construct_at(&m_value, other.value);
       }
 
-      has_value_ = other.has_value_;
+      m_has_value = other.m_has_value;
     }
 
-    Box(Box && other) noexcept {
-      static_assert(std::is_nothrow_move_constructible_v < ValueType >);
-
-      if (other.has_value_) {
-        ::new(&value_) ValueType(std::move(other.value_));
+    box(box && other) noexcept
+    requires std::is_nothrow_move_constructible_v < value_type > {
+      if (other.m_has_value) {
+        std::construct_at(&m_value, std::move(other.value));
       }
 
-      has_value_ = other.has_value_;
+      m_has_value = other.m_has_value;
     }
 
-    ~Box() {
-      static_assert(std::is_nothrow_destructible_v < ValueType >);
-
-      if (has_value_) {
-        value_.~ValueType();
+    ~box()
+    requires std::is_nothrow_destructible_v < value_type > {
+      if (m_has_value) {
+        std::destroy_at(&m_value);
       }
     }
 
-    Box & operator = (ValueType const& value) noexcept {
-      static_assert(std::is_nothrow_copy_assignable_v < ValueType > &&
-          std::is_nothrow_copy_constructible_v < ValueType >);
-
-      if (has_value_) {
-        value_ = value;
+    box & operator = (value_type const& value) noexcept
+    requires std::is_nothrow_copy_assignable_v < value_type > &&
+        std::is_nothrow_copy_constructible_v < value_type > {
+      if (m_has_value) {
+        m_value = value;
       }
       else {
-        ::new(&value_) ValueType(value);
+        std::construct_at(&m_value, value);
       }
 
-      has_value_ = true;
-
-      return *this;
+      m_has_value = true;
     }
 
-    Box & operator = (ValueType && value) noexcept {
-      static_assert(std::is_nothrow_move_assignable_v < ValueType > &&
-          std::is_nothrow_move_constructible_v < ValueType >);
-
-      if (has_value_) {
-        value_ = std::move(value);
+    box & operator = (value_type && value) noexcept
+    requires std::is_nothrow_move_assignable_v < value_type > &&
+        std::is_nothrow_move_constructible_v < value_type > {
+      if (m_has_value) {
+        m_value = std::move(value);
       }
       else {
-        ::new(&value_) ValueType(std::move(value));
+        std::construct_at(&m_value, std::move(value));
       }
 
-      has_value_ = true;
-
-      return *this;
+      m_has_value = true;
     }
 
-    Box & operator = (Box const& other) noexcept {
-      static_assert(std::is_nothrow_copy_assignable_v < ValueType > &&
-          std::is_nothrow_copy_constructible_v < ValueType > &&
-          std::is_nothrow_destructible_v < ValueType >);
-
+    box & operator = (box const& other) noexcept
+    requires std::is_nothrow_copy_assignable_v < value_type > &&
+        std::is_nothrow_copy_constructible_v < value_type > && std::is_nothrow_destructible_v < value_type > {
       if (this == &other) {
         return *this;
       }
 
-      if (other.has_value_) {
-        if (has_value_) {
-          value_ = other.value_;
+      if (other.m_has_value) {
+        if (m_has_value) {
+          m_value = other.m_value;
         }
         else {
-          ::new(&value_) ValueType(other.value_);
+          std::construct_at(&m_value, other.m_value);
         }
       }
-      else if (has_value_) {
-        value_.~ValueType();
+      else if (m_has_value) {
+        std::destroy_at(&m_value);
       }
 
-      has_value_ = other.has_value_;
+      m_has_value = other.m_has_value;
 
       return *this;
     }
 
-    Box & operator = (Box && other) noexcept {
-      static_assert(std::is_nothrow_move_assignable_v < ValueType > &&
-          std::is_nothrow_move_constructible_v < ValueType> &&
-          std::is_nothrow_destructible_v < ValueType >);
-
+    box & operator = (box && other) noexcept
+    requires std::is_nothrow_move_assignable_v < value_type > &&
+        std::is_nothrow_move_constructible_v < value_type > && std::is_nothrow_destructible_v < value_type > {
       if (this == &other) {
         return *this;
       }
 
-      if (other.has_value_) {
-        if (has_value_) {
-          value_ = std::move(other.value_);
+      if (other.m_has_value) {
+        if (m_has_value) {
+          m_value = std::move(other.m_value);
         }
         else {
-          ::new(&value_) ValueType(std::move(other.value_));
+          std::construct_at(&m_value, std::move(other.m_value));
         }
       }
-      else if (has_value_) {
-        value_.~ValueType();
+      else if (m_has_value) {
+        std::destroy_at(&m_value);
       }
 
-      has_value_ = other.has_value_;
+      m_has_value = other.m_has_value;
 
       return *this;
     }
 
     explicit operator bool() const noexcept {
-      return has_value_;
+      return m_has_value;
     }
 
-    ValueType const* operator -> () const noexcept {
-      return &value_;
+    value_type const* operator -> () const noexcept {
+      return &m_value;
     }
 
-    ValueType * operator -> () noexcept {
-      return &value_;
+    value_type * operator -> () noexcept {
+      return &m_value;
     }
 
-    ValueType const& operator * () const& noexcept {
-      return value_;
+    value_type const& operator * () const& noexcept {
+      return m_value;
     }
 
-    ValueType & operator * () & noexcept {
-      return value_;
+    value_type & operator * () & noexcept {
+      return m_value;
     }
 
-    ValueType const&& operator * () const&& noexcept {
-      return value_;
+    value_type const&& operator * () const&& noexcept {
+      return std::move(m_value);
     }
 
-    ValueType && operator * () && noexcept {
-      return value_;
+    value_type && operator * () && noexcept {
+      return std::move(m_value);
     }
 
     bool has_value() const noexcept {
-      return has_value_;
+      return m_has_value;
     }
 
-    ValueType const& value() const& noexcept {
-      return value_;
+    value_type const& value() const& noexcept {
+      return m_value;
     }
 
-    ValueType & value() & noexcept {
-      return value_;
+    value_type & value() & noexcept {
+      return m_value;
     }
 
-    ValueType const&& value() const&& noexcept {
-      return value_;
+    value_type const&& value() const&& noexcept {
+      return std::move(m_value);
     }
 
-    ValueType && value() && noexcept {
-      return value_;
+    value_type && value() && noexcept {
+      return std::move(m_value);
     }
   };
 
-  constexpr BoxConstruct kBoxConstruct;
+  constexpr box_construct_t BOX_CONSTRUCT;
 }
 
 #endif

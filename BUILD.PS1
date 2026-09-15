@@ -4,8 +4,7 @@ param (
   $config
 )
 
-$common_flags = @("/std:c++latest", "/utf-8", "/Iinclude/mttlib", "/c", "/W4")
-$source_files = Get-ChildItem "src\*" -Name | ForEach { "src\$_" }
+$common_flags = @("/std:c++latest", "/utf-8", "/Iinclude\mttlib", "/c", "/W4")
 $library_name = "mttlib"
 
 switch ($config) {
@@ -21,6 +20,10 @@ switch ($config) {
 
 if (-not (Test-Path $binary_directory)) { New-Item -ItemType Directory -Path $binary_directory -Force | Out-Null }
 
-& cl @common_flags @flags @source_files
+& cl @common_flags @flags "src\*"
 $object_files = Get-ChildItem "$binary_directory*.obj" | ForEach-Object { $_.FullName }
 & lib /OUT:"$binary_directory$library_name.lib" $object_files
+
+if ($config -eq "debug") {
+  & cl /std:c++latest /utf-8 /Iinclude\mttlib /Fo:$binary_directory /Fd:$binary_directory /Fe:$binary_directory /Zi /Od /MDd tests\test-1.cc bin\debug\mttlib.lib
+}
