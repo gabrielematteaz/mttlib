@@ -2,8 +2,7 @@
 #define MTTLIB_INCLUDE_BOX_H_
 
 #include <type_traits>
-#include <memory> // std::construct_at, std::destroy_at
-#include <utility> // std::forward, std::move
+#include <utility> // std::forward, std::move
 
 namespace mttlib {
   struct box_construct_t {
@@ -26,26 +25,27 @@ namespace mttlib {
     template < typename... parameters_type >
     requires std::is_nothrow_constructible_v < value_type, parameters_type... >
     explicit box(box_construct_t const&, parameters_type &&... arguments) noexcept {
-      std::construct_at(&m_value, std::forward < parameters_type > (arguments)...);
+      ::new(static_cast < void * > (&m_value)) value_type(std::forward < parameters_type >
+          (arguments)...);
       m_has_value = true;
     }
 
     box(value_type const& value) noexcept
     requires std::is_nothrow_copy_constructible_v < value_type > {
-      std::construct_at(&m_value, value);
+      ::new(static_cast < void * > (&m_value)) value_type(value);
       m_has_value = true;
     }
 
-    box(value_type && other) noexcept
+    box(value_type && value) noexcept
     requires std::is_nothrow_move_constructible_v < value_type > {
-      std::construct_at(&m_value, std::move(value));
+      ::new(static_cast < void * > (&m_value)) value_type(std::move(value));
       m_has_value = true;
     }
 
     box(box const& other) noexcept
     requires std::is_nothrow_copy_constructible_v < value_type > {
       if (other.m_has_value) {
-        std::construct_at(&m_value, other.value);
+        ::new(static_cast < void * > (&m_value)) value_type(other.value);
       }
 
       m_has_value = other.m_has_value;
@@ -54,7 +54,7 @@ namespace mttlib {
     box(box && other) noexcept
     requires std::is_nothrow_move_constructible_v < value_type > {
       if (other.m_has_value) {
-        std::construct_at(&m_value, std::move(other.value));
+        ::new(static_cast < void * > (&m_value)) value_type(std::move(other.value));
       }
 
       m_has_value = other.m_has_value;
@@ -63,7 +63,7 @@ namespace mttlib {
     ~box()
     requires std::is_nothrow_destructible_v < value_type > {
       if (m_has_value) {
-        std::destroy_at(&m_value);
+        m_value.~value_type();
       }
     }
 
@@ -74,7 +74,7 @@ namespace mttlib {
         m_value = value;
       }
       else {
-        std::construct_at(&m_value, value);
+        ::new(static_cast < void * > (&m_value)) value_type(value);
       }
 
       m_has_value = true;
@@ -87,7 +87,7 @@ namespace mttlib {
         m_value = std::move(value);
       }
       else {
-        std::construct_at(&m_value, std::move(value));
+        ::new(static_cast < void * > (&m_value)) value_type(std::move(value));
       }
 
       m_has_value = true;
@@ -95,7 +95,8 @@ namespace mttlib {
 
     box & operator = (box const& other) noexcept
     requires std::is_nothrow_copy_assignable_v < value_type > &&
-        std::is_nothrow_copy_constructible_v < value_type > && std::is_nothrow_destructible_v < value_type > {
+        std::is_nothrow_copy_constructible_v < value_type > &&
+        std::is_nothrow_destructible_v < value_type > {
       if (this == &other) {
         return *this;
       }
@@ -105,11 +106,11 @@ namespace mttlib {
           m_value = other.m_value;
         }
         else {
-          std::construct_at(&m_value, other.m_value);
+          ::new(static_cast < void * > (&m_value)) value_type(other.m_value);
         }
       }
       else if (m_has_value) {
-        std::destroy_at(&m_value);
+        m_value.~value_type();
       }
 
       m_has_value = other.m_has_value;
@@ -119,7 +120,8 @@ namespace mttlib {
 
     box & operator = (box && other) noexcept
     requires std::is_nothrow_move_assignable_v < value_type > &&
-        std::is_nothrow_move_constructible_v < value_type > && std::is_nothrow_destructible_v < value_type > {
+        std::is_nothrow_move_constructible_v < value_type > &&
+        std::is_nothrow_destructible_v < value_type > {
       if (this == &other) {
         return *this;
       }
@@ -129,11 +131,11 @@ namespace mttlib {
           m_value = std::move(other.m_value);
         }
         else {
-          std::construct_at(&m_value, std::move(other.m_value));
+          ::new(static_cast < void * > (&m_value)) value_type(std::move(other.m_value));
         }
       }
       else if (m_has_value) {
-        std::destroy_at(&m_value);
+        m_value.~value_type();
       }
 
       m_has_value = other.m_has_value;

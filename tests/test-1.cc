@@ -1,5 +1,12 @@
-#include "box.h"
+#include "vector.h"
 
 int main() {
-  mttlib::box < int > integer(mttlib::BOX_CONSTRUCT, 128);
+  auto integers = mttlib::vector < int >::construct(100);
+
+  if (integers.has_value() == false) {
+    return 1;
+  }
+
+  integers->resize(10);
+  integers->resize(20, 10);
 }
