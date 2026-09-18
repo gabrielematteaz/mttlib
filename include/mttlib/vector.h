@@ -3,10 +3,8 @@
 
 #include <new>
 #include <type_traits>
-#include <utility> // std::move
 
 #include "box.h"
-#include "utilities.h"
 
 namespace mttlib {
   template < typename value_type >
@@ -19,18 +17,21 @@ namespace mttlib {
     vector(vector const&) = delete;
     vector & operator = (vector const&) = delete;
 
-    static box < vector > construct(int capacity) noexcept {
-      int aligned_capacity = align_value(capacity);
-      auto data = allocate(aligned_capacity);
+    static box < vector > construct(int capacity, bool align = true) noexcept {
+      if (align) {
+        capacity = align_value(capacity);
+      }
+
+      value_type * data = allocate(capacity);
 
       if (data == nullptr) {
         return { };
       }
 
-      return vector(data, 0, aligned_capacity);
+      return vector(data, 0, capacity);
     }
 
-    vector() noexcept {
+    vector() {
       m_data = nullptr;
       m_size = 0;
       m_capacity = 0;
@@ -41,7 +42,7 @@ namespace mttlib {
       m_size = other.m_size;
       m_capacity = other.m_capacity;
       other.m_data = nullptr;
-      m_size = 0;
+      other.m_size = 0;
     }
 
     ~vector() {
@@ -58,9 +59,17 @@ namespace mttlib {
       m_size = other.m_size;
       m_capacity = other.m_capacity;
       other.m_data = nullptr;
-      m_size = 0;
+      other.m_size = 0;
 
       return *this;
+    }
+
+    value_type const& operator [] (int offset) const noexcept {
+      return m_data[offset];
+    }
+
+    value_type & operator [] (int offset) noexcept {
+      return m_data[offset];
     }
 
     value_type const* data() const noexcept {
@@ -75,9 +84,9 @@ namespace mttlib {
       return m_size;
     }
 
-    bool resize(int new_size) noexcept {
+    int resize(int new_size) noexcept {
       if (new_size <= m_size) {
-        destroy(m_data, new_size, m_size - new_size);
+        destroy(new_size, m_size - new_size);
       }
       else {
         if (new_size > m_capacity) {
@@ -85,26 +94,26 @@ namespace mttlib {
           value_type * new_data = allocate(new_capacity);
 
           if (new_data == nullptr) {
-            return false;
+            return 0;
           }
 
-          move_construct_uninitialized(m_data, 0, m_size, new_data);
+          move_construct_uninitialized(0, m_size, new_data);
           destroy();
           m_data = new_data;
           m_capacity = new_capacity;
         }
 
-        default_construct_uninitialized(m_data, m_size, new_size - m_size);
+        default_construct_uninitialized(m_size, new_size - m_size);
       }
 
       m_size = new_size;
 
-      return true;
+      return m_capacity;
     }
 
-    bool resize(int new_size, value_type const& value) noexcept {
+    int resize(int new_size, value_type const& value) noexcept {
       if (new_size <= m_size) {
-        destroy(m_data, new_size, m_size - new_size);
+        destroy(new_size, m_size - new_size);
       }
       else {
         if (new_size > m_capacity) {
@@ -112,37 +121,99 @@ namespace mttlib {
           value_type * new_data = allocate(new_capacity);
 
           if (new_data == nullptr) {
-            return false;
+            return 0;
           }
 
-          move_construct_uninitialized(m_data, 0, m_size, new_data);
+          move_construct_uninitialized(0, m_size, new_data);
           destroy();
           m_data = new_data;
           m_capacity = new_capacity;
         }
 
-        copy_construct_uninitialized(m_data, m_size, new_size - m_size, value);
+        copy_construct_uninitialized(m_size, new_size - m_size, value);
       }
 
       m_size = new_size;
 
-      return true;
-    }
-
-    bool empty() const noexcept {
-      return m_size == 0;
+      return m_capacity;
     }
 
     int capacity() const noexcept {
       return m_capacity;
     }
 
-  private:
-    static value_type * allocate(int count) noexcept {
-      return static_cast < value_type * > (::operator new(count * sizeof(value_type),
-          std::nothrow));
+    int reserve(int new_capacity, bool align = true) noexcept {
+      if (new_capacity <= m_capacity) {
+        return m_capacity;
+      }
+
+      if (align) {
+        new_capacity = align_value(new_capacity);
+      }
+
+      value_type * new_data = allocate(new_capacity);
+
+      if (new_data == nullptr) {
+        return 0;
+      }
+
+      move_construct_uninitialized(0, m_size, new_data);
+      destroy();
+      m_data = new_data;
+      m_capacity = new_capacity;
+
+      return new_capacity;
     }
 
+    int push_back(value_type const& value) noexcept
+    requires std::is_nothrow_copy_constructible_v < value_type > {
+      int new_size = m_size + 1;
+
+      if (new_size > m_capacity) {
+        int new_capacity = align_value(new_size);
+        value_type * new_data = allocate(new_capacity);
+
+        if (new_data == nullptr) {
+          return 0;
+        }
+
+        move_construct_uninitialized(0, m_size, new_data);
+        destroy();
+        m_data = new_data;
+        m_capacity = new_capacity;
+      }
+
+      ::new(static_cast < void * > (m_data + m_size)) value_type(value);
+      m_size = new_size;
+
+      return m_capacity;
+    }
+
+    int push_back(value_type && value) noexcept
+    requires std::is_nothrow_move_constructible_v < value_type > {
+      int new_size = m_size + 1;
+
+      if (new_size > m_capacity) {
+        int new_capacity = align_value(new_size);
+        value_type * new_data = allocate(new_capacity);
+
+        if (new_data == nullptr) {
+          return 0;
+        }
+
+        move_construct_uninitialized(0, m_size, new_data);
+        destroy();
+        m_data = new_data;
+        m_capacity = new_capacity;
+      }
+
+      ::new(static_cast < void * > (m_data + m_size)) value_type(std::move(value));
+      m_size = new_size;
+
+      return m_capacity;
+    }
+
+  private:
     static int align_value(int value) noexcept {
       if (value == 0) {
         return 0;
@@ -157,15 +228,81 @@ namespace mttlib {
       return aligned_value;
     }
 
+    static value_type * allocate(int count) noexcept {
+      return static_cast < value_type * > (::operator new(count * sizeof(value_type),
+          std::nothrow));
+    }
+
     vector(value_type * data, int size, int capacity) noexcept {
       m_data = data;
       m_size = size;
       m_capacity = capacity;
     }
 
+    void copy_construct_uninitialized(int offset, int count, value_type const& value) noexcept
+    requires std::is_nothrow_copy_constructible_v < value_type > {
+      if (count == 0) {
+        return;
+      }
+
+      value_type * current = m_data + offset;
+
+      do {
+        ::new(static_cast < void * > (current)) value_type(value);
+        ++current;
+        --count;
+      } while (count != 0);
+    }
+
+    void default_construct_uninitialized(int offset, int count) noexcept
+    requires std::is_nothrow_default_constructible_v < value_type > {
+      if (count == 0) {
+        return;
+      }
+
+      value_type * current = m_data + offset;
+
+      do {
+        ::new(static_cast < void * > (current)) value_type();
+        ++current;
+        --count;
+      } while (count != 0);
+    }
+
+    void destroy(int offset, int count) noexcept
+    requires std::is_nothrow_destructible_v < value_type > {
+      if (count == 0) {
+        return;
+      }
+
+      value_type * current = m_data + offset;
+
+      do {
+        current->~value_type();
+        ++current;
+        --count;
+      } while (count != 0);
+    }
+
     void destroy() noexcept {
-      destroy(m_data, 0, m_size);
+      destroy(0, m_size);
       ::operator delete(m_data);
+    }
+
+    void move_construct_uninitialized(int offset, int count, value_type * destination) noexcept
+    requires std::is_nothrow_move_constructible_v < value_type > {
+      if (count == 0) {
+        return;
+      }
+
+      value_type * current = m_data + offset;
+
+      do {
+        ::new(static_cast < void * > (destination)) value_type(std::move(*current));
+        ++destination;
+        ++current;
+        --count;
+      } while (count != 0);
     }
   };
 }

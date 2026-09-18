@@ -2,7 +2,7 @@
 #define MTTLIB_INCLUDE_BOX_H_
 
 #include <type_traits>
-#include <utility> // std::forward, std::move
+#include <utility> // std::forward, std::move
 
 namespace mttlib {
   struct box_construct_t {
