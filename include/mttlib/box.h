@@ -25,8 +25,7 @@ namespace mttlib {
     template < typename... parameters_type >
     requires std::is_nothrow_constructible_v < value_type, parameters_type... >
     explicit box(box_construct_t const&, parameters_type &&... arguments) noexcept {
-      ::new(static_cast < void * > (&m_value)) value_type(std::forward < parameters_type >
-          (arguments)...);
+      ::new(static_cast < void * > (&m_value)) value_type(std::forward < parameters_type > (arguments)...);
       m_has_value = true;
     }
 
@@ -68,7 +67,8 @@ namespace mttlib {
     }
 
     box & operator = (value_type const& value) noexcept
-    requires std::is_nothrow_copy_assignable_v < value_type > &&
+    requires
+        std::is_nothrow_copy_assignable_v < value_type > &&
         std::is_nothrow_copy_constructible_v < value_type > {
       if (m_has_value) {
         m_value = value;
@@ -81,7 +81,8 @@ namespace mttlib {
     }
 
     box & operator = (value_type && value) noexcept
-    requires std::is_nothrow_move_assignable_v < value_type > &&
+    requires
+        std::is_nothrow_move_assignable_v < value_type > &&
         std::is_nothrow_move_constructible_v < value_type > {
       if (m_has_value) {
         m_value = std::move(value);
@@ -94,7 +95,8 @@ namespace mttlib {
     }
 
     box & operator = (box const& other) noexcept
-    requires std::is_nothrow_copy_assignable_v < value_type > &&
+    requires
+        std::is_nothrow_copy_assignable_v < value_type > &&
         std::is_nothrow_copy_constructible_v < value_type > &&
         std::is_nothrow_destructible_v < value_type > {
       if (this == &other) {
@@ -119,7 +121,8 @@ namespace mttlib {
     }
 
     box & operator = (box && other) noexcept
-    requires std::is_nothrow_move_assignable_v < value_type > &&
+    requires
+        std::is_nothrow_move_assignable_v < value_type > &&
         std::is_nothrow_move_constructible_v < value_type > &&
         std::is_nothrow_destructible_v < value_type > {
       if (this == &other) {

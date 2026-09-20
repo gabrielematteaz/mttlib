@@ -3,6 +3,7 @@
 
 #include <new>
 #include <type_traits>
+#include <utility> // std::move, std::forward
 
 #include "box.h"
 
@@ -17,6 +18,7 @@ namespace mttlib {
     vector(vector const&) = delete;
     vector & operator = (vector const&) = delete;
 
+    // assert(0 <= capacity)
     static box < vector > construct(int capacity, bool align = true) noexcept {
       if (align) {
         capacity = align_value(capacity);
@@ -64,10 +66,12 @@ namespace mttlib {
       return *this;
     }
 
+    // assert(0 <= offset && offset < size())
     value_type const& operator [] (int offset) const noexcept {
       return m_data[offset];
     }
 
+    // assert(0 <= offset && offset < size())
     value_type & operator [] (int offset) noexcept {
       return m_data[offset];
     }
@@ -84,6 +88,7 @@ namespace mttlib {
       return m_size;
     }
 
+    // assert(0 <= new_size)
     int resize(int new_size) noexcept {
       if (new_size <= m_size) {
         destroy(new_size, m_size - new_size);
@@ -111,6 +116,7 @@ namespace mttlib {
       return m_capacity;
     }
 
+    // assert(0 <= new_size)
     int resize(int new_size, value_type const& value) noexcept {
       if (new_size <= m_size) {
         destroy(new_size, m_size - new_size);
@@ -142,6 +148,7 @@ namespace mttlib {
       return m_capacity;
     }
 
+    // assert(0 <= new_capacity)
     int reserve(int new_capacity, bool align = true) noexcept {
       if (new_capacity <= m_capacity) {
         return m_capacity;
@@ -211,6 +218,62 @@ namespace mttlib {
       m_size = new_size;
 
       return m_capacity;
+    }
+
+    template < typename... parameters_type >
+    int emplace_back(parameters_type &&... arguments) noexcept
+    requires std::is_nothrow_constructible_v < value_type, parameters_type... > {
+      int new_size = m_size + 1;
+
+      if (new_size > m_capacity) {
+        int new_capacity = align_value(new_size);
+        value_type * new_data = allocate(new_capacity);
+
+        if (new_data == nullptr) {
+          return 0;
+        }
+
+        move_construct_uninitialized(0, m_size, new_data);
+        destroy();
+        m_data = new_data;
+        m_capacity = new_capacity;
+      }
+
+      ::new(static_cast < void * > (m_data + m_size)) value_type(std::forward < parameters_type > (arguments)...);
+      m_size = new_size;
+
+      return m_capacity;
+    }
+
+    // assert(0 <= offset && 0 <= count && offset + count <= size()))
+    void erase(int offset, int count) noexcept
+    requires
+        std::is_nothrow_move_assignable_v < value_type > &&
+        std::is_nothrow_destructible_v < value_type > {
+      if (count == 0) {
+        return;
+      }
+
+      value_type * destination = m_data + offset;
+      value_type * current = destination + count;
+      value_type * last = m_data + m_size;
+
+      do {
+        *destination = std::move(*current);
+        ++destination;
+        ++current;
+      } while (current != last);
+
+      for (; destination != last; ++destination) {
+        destination->~value_type();
+      }
+
+      m_size = m_size - count;
+    }
+
+    void clear() noexcept {
+      destroy(0, m_size);
+      m_size = 0;
     }
 
   private:
