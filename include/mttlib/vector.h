@@ -292,8 +292,7 @@ namespace mttlib {
     }
 
     static value_type * allocate(int count) noexcept {
-      return static_cast < value_type * > (::operator new(count * sizeof(value_type),
-          std::nothrow));
+      return static_cast < value_type * > (::operator new(count * sizeof(value_type), std::nothrow));
     }
 
     vector(value_type * data, int size, int capacity) noexcept {
