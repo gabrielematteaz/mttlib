@@ -1,6 +1,7 @@
-#ifndef MTTLIB_INCLUDE_VECTOR_H_
-#define MTTLIB_INCLUDE_VECTOR_H_
+#ifndef MTTLIB_VECTOR_H_
+#define MTTLIB_VECTOR_H_
 
+#include <algorithm>
 #include <new>
 #include <type_traits>
 #include <utility> // std::move, std::forward
@@ -18,7 +19,7 @@ namespace mttlib {
     vector(vector const&) = delete;
     vector & operator = (vector const&) = delete;
 
-    // assert(0 <= capacity)
+    // assert(capacity >= 0)
     static box < vector > construct(int capacity, bool align = true) noexcept {
       if (align) {
         capacity = align_value(capacity);
@@ -33,7 +34,7 @@ namespace mttlib {
       return vector(data, 0, capacity);
     }
 
-    vector() {
+    vector() noexcept {
       m_data = nullptr;
       m_size = 0;
       m_capacity = 0;
@@ -66,14 +67,30 @@ namespace mttlib {
       return *this;
     }
 
-    // assert(0 <= offset && offset < size())
+    // assert(offset >= 0 && offset < size())
     value_type const& operator [] (int offset) const noexcept {
       return m_data[offset];
     }
 
-    // assert(0 <= offset && offset < size())
+    // assert(offset >= 0 && offset < size())
     value_type & operator [] (int offset) noexcept {
       return m_data[offset];
+    }
+
+    value_type const* begin() const noexcept {
+      return m_data;
+    }
+
+    value_type * begin() noexcept {
+      return m_data;
+    }
+
+    value_type const* end() const noexcept {
+      return m_data == nullptr ? nullptr : m_data + m_size;
+    }
+
+    value_type * end() noexcept {
+      return m_data == nullptr ? nullptr : m_data + m_size;
     }
 
     value_type const* data() const noexcept {
@@ -88,38 +105,15 @@ namespace mttlib {
       return m_size;
     }
 
-    // assert(0 <= new_size)
-    int resize(int new_size) noexcept {
-      if (new_size <= m_size) {
-        destroy(new_size, m_size - new_size);
-      }
-      else {
-        if (new_size > m_capacity) {
-          int new_capacity = align_value(new_size);
-          value_type * new_data = allocate(new_capacity);
-
-          if (new_data == nullptr) {
-            return 0;
-          }
-
-          move_construct_uninitialized(0, m_size, new_data);
-          destroy();
-          m_data = new_data;
-          m_capacity = new_capacity;
-        }
-
-        default_construct_uninitialized(m_size, new_size - m_size);
-      }
-
-      m_size = new_size;
-
-      return m_capacity;
+    bool empty() const noexcept {
+      return m_size == 0;
     }
 
-    // assert(0 <= new_size)
-    int resize(int new_size, value_type const& value) noexcept {
+    // assert(new_size >= 0)
+    bool resize(int new_size) noexcept
+    requires std::is_nothrow_default_constructible_v < value_type > {
       if (new_size <= m_size) {
-        destroy(new_size, m_size - new_size);
+        destroy(m_size, m_size - new_size);
       }
       else {
         if (new_size > m_capacity) {
@@ -127,52 +121,85 @@ namespace mttlib {
           value_type * new_data = allocate(new_capacity);
 
           if (new_data == nullptr) {
-            return 0;
+            return false;
           }
 
-          move_construct_uninitialized(0, m_size, new_data);
+          move_construct(0, m_size, new_data);
           destroy();
           m_data = new_data;
           m_capacity = new_capacity;
         }
 
-        copy_construct_uninitialized(m_size, new_size - m_size, value);
+        std::ranges::uninitialized_default_construct(m_data + m_size, m_data + new_size);
       }
 
       m_size = new_size;
 
-      return m_capacity;
+      return true;
+    }
+
+    // assert(new_size >= 0)
+    bool resize(int new_size, value_type const& value) noexcept
+    requires std::is_nothrow_copy_constructible_v < value_type > {
+      if (new_size <= m_size) {
+        destroy(new_size, m_size);
+      }
+      else {
+        if (new_size > m_capacity) {
+          int new_capacity = align_value(new_size);
+          value_type * new_data = allocate(new_capacity);
+
+          if (new_data == nullptr) {
+            return false;
+          }
+
+          move_construct(0, m_size, new_data);
+          destroy();
+          m_data = new_data;
+          m_capacity = new_capacity;
+        }
+
+        for (auto current = m_data + m_size, last = m_data + new_size; current != last; ++current) {
+          ::new(static_cast < void * > (current)) value_type(value);
+        }
+      }
+
+      m_size = new_size;
+
+      return true;
     }
 
     int capacity() const noexcept {
       return m_capacity;
     }
 
-    // assert(0 <= new_capacity)
-    int reserve(int new_capacity, bool align = true) noexcept {
-      if (new_capacity <= m_capacity) {
-        return m_capacity;
-      }
-
+    // assert(new_capacity >= 0)
+    bool reserve(int new_capacity, bool align = true) noexcept {
       if (align) {
         new_capacity = align_value(new_capacity);
+      }
+
+      if (new_capacity <= m_capacity) {
+        return true;
       }
 
       value_type * new_data = allocate(new_capacity);
 
       if (new_data == nullptr) {
-        return 0;
+        return false;
       }
 
-      move_construct_uninitialized(0, m_size, new_data);
+      move_construct(0, m_size, new_data);
       destroy();
       m_data = new_data;
       m_capacity = new_capacity;
 
-      return new_capacity;
+      return true;
     }
 
-    int push_back(value_type const& value) noexcept
+    // insert
+
+    bool push_back(value_type const& value) noexcept
     requires std::is_nothrow_copy_constructible_v < value_type > {
       int new_size = m_size + 1;
 
@@ -181,10 +208,10 @@ namespace mttlib {
         value_type * new_data = allocate(new_capacity);
 
         if (new_data == nullptr) {
-          return 0;
+          return false;
         }
 
-        move_construct_uninitialized(0, m_size, new_data);
+        move_construct(0, m_size, new_data);
         destroy();
         m_data = new_data;
         m_capacity = new_capacity;
@@ -193,10 +220,10 @@ namespace mttlib {
       ::new(static_cast < void * > (m_data + m_size)) value_type(value);
       m_size = new_size;
 
-      return m_capacity;
+      return true;
     }
 
-    int push_back(value_type && value) noexcept
+    bool push_back(value_type && value) noexcept
     requires std::is_nothrow_move_constructible_v < value_type > {
       int new_size = m_size + 1;
 
@@ -205,10 +232,10 @@ namespace mttlib {
         value_type * new_data = allocate(new_capacity);
 
         if (new_data == nullptr) {
-          return 0;
+          return false;
         }
 
-        move_construct_uninitialized(0, m_size, new_data);
+        move_construct(0, m_size, new_data);
         destroy();
         m_data = new_data;
         m_capacity = new_capacity;
@@ -217,11 +244,11 @@ namespace mttlib {
       ::new(static_cast < void * > (m_data + m_size)) value_type(std::move(value));
       m_size = new_size;
 
-      return m_capacity;
+      return true;
     }
 
     template < typename... parameters_type >
-    int emplace_back(parameters_type &&... arguments) noexcept
+    bool emplace_back(parameters_type &&... arguments) noexcept
     requires std::is_nothrow_constructible_v < value_type, parameters_type... > {
       int new_size = m_size + 1;
 
@@ -230,10 +257,10 @@ namespace mttlib {
         value_type * new_data = allocate(new_capacity);
 
         if (new_data == nullptr) {
-          return 0;
+          return false;
         }
 
-        move_construct_uninitialized(0, m_size, new_data);
+        move_construct(0, m_size, new_data);
         destroy();
         m_data = new_data;
         m_capacity = new_capacity;
@@ -242,10 +269,10 @@ namespace mttlib {
       ::new(static_cast < void * > (m_data + m_size)) value_type(std::forward < parameters_type > (arguments)...);
       m_size = new_size;
 
-      return m_capacity;
+      return true;
     }
 
-    // assert(0 <= offset && 0 <= count && offset + count <= size()))
+    // assert(offset >= 0 && count >= 0 && offset + count <= size())
     void erase(int offset, int count) noexcept
     requires
         std::is_nothrow_move_assignable_v < value_type > &&
@@ -255,16 +282,14 @@ namespace mttlib {
       }
 
       value_type * destination = m_data + offset;
-      value_type * current = destination + count;
+      value_type * source = destination + count;
       value_type * last = m_data + m_size;
 
-      do {
-        *destination = std::move(*current);
-        ++destination;
-        ++current;
-      } while (current != last);
+      for (; source != last; ++destination, ++source) {
+        *destination = *source;
+      }
 
-      for (; destination != last; ++destination) {
+      for (; destination != last; ++ destination) {
         destination->~value_type();
       }
 
@@ -301,49 +326,19 @@ namespace mttlib {
       m_capacity = capacity;
     }
 
-    void copy_construct_uninitialized(int offset, int count, value_type const& value) noexcept
-    requires std::is_nothrow_copy_constructible_v < value_type > {
-      if (count == 0) {
-        return;
-      }
-
-      value_type * current = m_data + offset;
-
-      do {
-        ::new(static_cast < void * > (current)) value_type(value);
-        ++current;
-        --count;
-      } while (count != 0);
-    }
-
-    void default_construct_uninitialized(int offset, int count) noexcept
-    requires std::is_nothrow_default_constructible_v < value_type > {
-      if (count == 0) {
-        return;
-      }
-
-      value_type * current = m_data + offset;
-
-      do {
-        ::new(static_cast < void * > (current)) value_type();
-        ++current;
-        --count;
-      } while (count != 0);
-    }
-
-    void destroy(int offset, int count) noexcept
+    void destroy(int from_index, int to_index) noexcept
     requires std::is_nothrow_destructible_v < value_type > {
-      if (count == 0) {
+      if (from_index == to_index) {
         return;
       }
 
-      value_type * current = m_data + offset;
+      value_type * current = m_data + from_index;
+      value_type * last = m_data + to_index;
 
       do {
         current->~value_type();
         ++current;
-        --count;
-      } while (count != 0);
+      } while (current != last);
     }
 
     void destroy() noexcept {
@@ -351,20 +346,20 @@ namespace mttlib {
       ::operator delete(m_data);
     }
 
-    void move_construct_uninitialized(int offset, int count, value_type * destination) noexcept
+    void move_construct(int from_index, int to_index, value_type * destination) noexcept
     requires std::is_nothrow_move_constructible_v < value_type > {
-      if (count == 0) {
+      if (from_index == to_index) {
         return;
       }
 
-      value_type * current = m_data + offset;
+      value_type * current = m_data + from_index;
+      value_type * last = m_data + to_index;
 
       do {
         ::new(static_cast < void * > (destination)) value_type(std::move(*current));
         ++destination;
         ++current;
-        --count;
-      } while (count != 0);
+      } while (current != last);
     }
   };
 }
