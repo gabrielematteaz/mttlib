@@ -2,6 +2,7 @@
 #define MTTLIB_NOTHROW_STRING_H_
 
 #include <algorithm>
+#include <cstdint>
 #include <new>
 
 #include "box.h"
@@ -10,7 +11,7 @@
 namespace mttlib {
   class nothrow_string {
     static constexpr int ALIGNMENT = 16;
-    static inline char FALLBACK[1]{ '\0' };
+    static inline char m_fallback[1]{ '\0' };
 
     char * m_data;
     int m_size;
@@ -29,9 +30,7 @@ namespace mttlib {
         return { };
       }
 
-      data[0] = '\0';
-
-      return nothrow_string(data, 0, aligned_capacity);
+      return box < nothrow_string > (BOX_CONSTRUCT, nothrow_string(data, 0, aligned_capacity));
     }
 
     // assert(count >= 0)
@@ -46,7 +45,7 @@ namespace mttlib {
       std::ranges::fill(data, data + count, character);
       data[count] = '\0';
 
-      return nothrow_string(data, count, capacity);
+      return box < nothrow_string > (BOX_CONSTRUCT, nothrow_string(data, count, capacity));
     }
 
     // assert(c_string != nullptr)
@@ -61,10 +60,10 @@ namespace mttlib {
 
       std::ranges::copy(c_string, c_string + length + 1, data);
 
-      return nothrow_string(data, length, capacity);
+      return box < nothrow_string > (BOX_CONSTRUCT, nothrow_string(data, length, capacity));
     }
 
-    // assert(characters != nullptr && count)
+    // assert(count == 0 || characters != nullptr && count > 0)
     static box < nothrow_string > construct(char const* characters, int count) noexcept {
       int capacity = align_value(count);
       char * data = new(std::nothrow) char[capacity];
@@ -73,14 +72,30 @@ namespace mttlib {
         return { };
       }
 
-      std::ranges::copy(characters, characters + count, data);
+      if (count != 0) {
+        std::ranges::copy(characters, characters + count, data);
+      }
+
       data[count] = '\0';
 
-      return nothrow_string(data, count, capacity);
+      return box < nothrow_string > (BOX_CONSTRUCT, nothrow_string(data, count, capacity));
+    }
+
+    static box < nothrow_string > construct(nothrow_string const& other, bool shrink = false) noexcept {
+      int capacity = shrink ? align_value(other.m_size) : other.m_capacity;
+      char * data = new(std::nothrow) char[capacity];
+
+      if (data == nullptr) {
+        return { };
+      }
+
+      std::ranges::copy(other.m_data, other.m_data + other.m_size + 1, data);
+
+      return box < nothrow_string > (BOX_CONSTRUCT, nothrow_string(data, other.m_size, capacity));
     }
 
     nothrow_string() noexcept {
-      m_data = FALLBACK;
+      m_data = m_fallback;
       m_size = 0;
       m_capacity = 0;
     }
@@ -89,7 +104,7 @@ namespace mttlib {
       m_data = other.m_data;
       m_size = other.m_size;
       m_capacity = other.m_capacity;
-      other.m_data = FALLBACK;
+      other.m_data = other.m_fallback;
     }
 
     ~nothrow_string() {
@@ -105,12 +120,12 @@ namespace mttlib {
       m_data = other.m_data;
       m_size = other.m_size;
       m_capacity = other.m_capacity;
-      other.m_data = FALLBACK;
+      other.m_data = other.m_fallback;
 
       return *this;
     }
 
-    explicit operator character_span() const noexcept {
+    operator character_span() const noexcept {
       return { m_data, m_size };
     }
 
@@ -189,11 +204,12 @@ namespace mttlib {
 
     // assert(new_capacity >= 0)
     bool reserve(int new_capacity) noexcept {
-      if (new_capacity < m_capacity) {
+      int aligned_new_capacity = align_value(new_capacity);
+
+      if (aligned_new_capacity <= new_capacity) {
         return true;
       }
 
-      int aligned_new_capacity = align_value(new_capacity);
       char * new_data = new(std::nothrow) char[aligned_new_capacity];
 
       if (new_data == nullptr) {
@@ -203,7 +219,35 @@ namespace mttlib {
       std::ranges::copy(m_data, m_data + m_size + 1, new_data);
       destroy();
       m_data = new_data;
-      m_capacity = aligned_new_capacity;
+      m_capacity = new_capacity;
+
+      return true;
+    }
+
+    // assert(offset >= 0 && offset <= size() && count >= 0)
+    bool insert(int offset, char character, int count) noexcept {
+      int new_size = m_size + count;
+      int new_capacity = align_value(new_size);
+
+      if (new_capacity > m_capacity) {
+        char * new_data = new(std::nothrow) char[new_capacity];
+
+        if (new_data == nullptr) {
+          return false;
+        }
+
+        std::ranges::copy(m_data, m_data + offset, new_data);
+        std::ranges::copy(m_data + offset, m_data + m_size + 1, new_data + offset + count);
+        destroy();
+        m_data = new_data;
+        m_capacity = new_capacity;
+      }
+      else {
+        std::ranges::copy_backward(m_data + offset, m_data + m_size + 1, m_data + new_size + 1);
+      }
+
+      std::ranges::fill(m_data + offset, m_data + offset + count, character);
+      m_size = new_size;
 
       return true;
     }
@@ -213,7 +257,7 @@ namespace mttlib {
       return insert(offset, c_string, length(c_string));
     }
 
-    // assert(offset >= 0 && offset <= size() && characters != nullptr && count >= 0)
+    // assert(offset >= 0 && offset <= size() && (count == 0 || characters != nullptr && count > 0))
     bool insert(int offset, char const* characters, int count) noexcept {
       int new_size = m_size + count;
       int new_capacity = align_value(new_size);
@@ -235,7 +279,40 @@ namespace mttlib {
         std::ranges::copy_backward(m_data + offset, m_data + m_size + 1, m_data + new_size + 1);
       }
 
-      std::ranges::copy(characters, characters + count, m_data + offset);
+      if (count != 0) {
+        std::ranges::copy(characters, characters + count, m_data + offset);
+      }
+
+      m_size = new_size;
+
+      return true;
+    }
+
+    // assert(offset >= 0 && offset <= size())
+    bool insert(nothrow_string const& other) noexcept {
+      return insert(offset, other.m_data, other.m_size);
+    }
+
+    // assert(count >= 0)
+    bool append(char character, int count) noexcept {
+      int new_size = m_size + count;
+      int new_capacity = align_value(new_size);
+
+      if (new_capacity > m_capacity) {
+        char * new_data = new(std::nothrow) char[new_capacity];
+
+        if (new_data == nullptr) {
+          return false;
+        }
+
+        std::ranges::copy(m_data, m_data + m_size, new_data);
+        destroy();
+        m_data = new_data;
+        m_capacity = new_capacity;
+      }
+
+      std::ranges::fill(m_data + m_size, m_data + new_size, character);
+      m_data[new_size] = '\0';
       m_size = new_size;
 
       return true;
@@ -266,7 +343,7 @@ namespace mttlib {
       return true;
     }
 
-    // assert(characters != nullptr && count >= 0)
+    // assert(count == 0 || characters != nullptr && count > 0)
     bool append(char const* characters, int count) noexcept {
       int new_size = m_size + count;
       int new_capacity = align_value(new_size);
@@ -284,8 +361,34 @@ namespace mttlib {
         m_capacity = new_capacity;
       }
 
-      std::ranges::copy(characters, characters + count, m_data + m_size);
+      if (count != 0) {
+        std::ranges::copy(characters, characters + count, m_data + m_size);
+      }
+
       m_data[new_size] = '\0';
+      m_size = new_size;
+
+      return true;
+    }
+
+    bool append(nothrow_string const& other) noexcept {
+      int new_size = m_size + other.m_size;
+      int new_capacity = align_value(new_size);
+
+      if (new_capacity > m_capacity) {
+        char * new_data = new(std::nothrow) char[new_capacity];
+
+        if (new_data == nullptr) {
+          return false;
+        }
+
+        std::ranges::copy(m_data, m_data + m_size, new_data);
+        destroy();
+        m_data = new_data;
+        m_capacity = new_capacity;
+      }
+
+      std::ranges::copy(other.m_data, other.m_data + other.m_size + 1, m_data + m_size);
       m_size = new_size;
 
       return true;
@@ -304,7 +407,14 @@ namespace mttlib {
 
   private:
     static int align_value(int value) noexcept {
-      return (value / ALIGNMENT + 1) * ALIGNMENT;
+      int aligned_value = 1;
+
+      // guarantees enough memory for the null terminator
+      while (aligned_value <= value) {
+        aligned_value = aligned_value * 2;
+      }
+
+      return aligned_value;
     }
 
     nothrow_string(char * data, int size, int capacity) noexcept {
@@ -314,11 +424,17 @@ namespace mttlib {
     }
 
     void destroy() noexcept {
-      if (m_data == FALLBACK) {
+      if (m_data == m_fallback) {
         return;
       }
 
       delete[] m_data;
+    }
+  };
+
+  struct case_sensitive_hasher_nothrow_string {
+    std::uint64_t operator () (nothrow_string const& value) const noexcept {
+      return case_sensitive_hasher_character_span() (value);
     }
   };
 }

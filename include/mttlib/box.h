@@ -1,6 +1,8 @@
-#ifndef MTTLIB_INCLUDE_BOX_H_
-#define MTTLIB_INCLUDE_BOX_H_
+#ifndef MTTLIB_BOX_H_
+#define MTTLIB_BOX_H_
 
+#include <memory> // std::addressof, std::ranges::construct_at, std::ranges::destroy_at
+#include <new>
 #include <type_traits>
 #include <utility> // std::forward, std::move
 
@@ -23,28 +25,16 @@ namespace mttlib {
     }
 
     template < typename... parameters_type >
-    requires std::is_nothrow_constructible_v < value_type, parameters_type... >
-    explicit box(box_construct_t const&, parameters_type &&... arguments) noexcept {
-      ::new(static_cast < void * > (&m_value)) value_type(std::forward < parameters_type > (arguments)...);
-      m_has_value = true;
-    }
-
-    box(value_type const& value) noexcept
-    requires std::is_nothrow_copy_constructible_v < value_type > {
-      ::new(static_cast < void * > (&m_value)) value_type(value);
-      m_has_value = true;
-    }
-
-    box(value_type && value) noexcept
-    requires std::is_nothrow_move_constructible_v < value_type > {
-      ::new(static_cast < void * > (&m_value)) value_type(std::move(value));
+    explicit box(box_construct_t const&, parameters_type &&... arguments) noexcept
+    requires std::is_nothrow_constructible_v < value_type, parameters_type... > {
+      std::ranges::construct_at(&m_value, std::forward < parameters_type > (arguments)...);
       m_has_value = true;
     }
 
     box(box const& other) noexcept
     requires std::is_nothrow_copy_constructible_v < value_type > {
       if (other.m_has_value) {
-        ::new(static_cast < void * > (&m_value)) value_type(other.value);
+        std::ranges::construct_at(&m_value, other.value);
       }
 
       m_has_value = other.m_has_value;
@@ -53,45 +43,16 @@ namespace mttlib {
     box(box && other) noexcept
     requires std::is_nothrow_move_constructible_v < value_type > {
       if (other.m_has_value) {
-        ::new(static_cast < void * > (&m_value)) value_type(std::move(other.value));
+        std::ranges::construct_at(&m_value, std::move(other.value));
       }
 
       m_has_value = other.m_has_value;
     }
 
-    ~box()
-    requires std::is_nothrow_destructible_v < value_type > {
+    ~box() {
       if (m_has_value) {
-        m_value.~value_type();
+        std::ranges::destroy_at(std::addressof(m_value));
       }
-    }
-
-    box & operator = (value_type const& value) noexcept
-    requires
-        std::is_nothrow_copy_assignable_v < value_type > &&
-        std::is_nothrow_copy_constructible_v < value_type > {
-      if (m_has_value) {
-        m_value = value;
-      }
-      else {
-        ::new(static_cast < void * > (&m_value)) value_type(value);
-      }
-
-      m_has_value = true;
-    }
-
-    box & operator = (value_type && value) noexcept
-    requires
-        std::is_nothrow_move_assignable_v < value_type > &&
-        std::is_nothrow_move_constructible_v < value_type > {
-      if (m_has_value) {
-        m_value = std::move(value);
-      }
-      else {
-        ::new(static_cast < void * > (&m_value)) value_type(std::move(value));
-      }
-
-      m_has_value = true;
     }
 
     box & operator = (box const& other) noexcept
@@ -99,25 +60,19 @@ namespace mttlib {
         std::is_nothrow_copy_assignable_v < value_type > &&
         std::is_nothrow_copy_constructible_v < value_type > &&
         std::is_nothrow_destructible_v < value_type > {
-      if (this == &other) {
-        return *this;
-      }
-
       if (other.m_has_value) {
         if (m_has_value) {
           m_value = other.m_value;
         }
         else {
-          ::new(static_cast < void * > (&m_value)) value_type(other.m_value);
+          std::ranges::construct_at(&m_value, other.value);
         }
       }
       else if (m_has_value) {
-        m_value.~value_type();
+        std::ranges::destroy_at(std::addressof(m_value));
       }
 
       m_has_value = other.m_has_value;
-
-      return *this;
     }
 
     box & operator = (box && other) noexcept
@@ -125,25 +80,19 @@ namespace mttlib {
         std::is_nothrow_move_assignable_v < value_type > &&
         std::is_nothrow_move_constructible_v < value_type > &&
         std::is_nothrow_destructible_v < value_type > {
-      if (this == &other) {
-        return *this;
-      }
-
       if (other.m_has_value) {
         if (m_has_value) {
           m_value = std::move(other.m_value);
         }
         else {
-          ::new(static_cast < void * > (&m_value)) value_type(std::move(other.m_value));
+          std::ranges::construct_at(&m_value, std::move(other.value));
         }
       }
       else if (m_has_value) {
-        m_value.~value_type();
+        std::ranges::destroy_at(std::addressof(m_value));
       }
 
       m_has_value = other.m_has_value;
-
-      return *this;
     }
 
     explicit operator bool() const noexcept {
@@ -151,11 +100,11 @@ namespace mttlib {
     }
 
     value_type const* operator -> () const noexcept {
-      return &m_value;
+      return std::addressof(m_value);
     }
 
     value_type * operator -> () noexcept {
-      return &m_value;
+      return std::addressof(m_value);
     }
 
     value_type const& operator * () const& noexcept {

@@ -1,5 +1,7 @@
-#ifndef MTTLIB_CHARACTER_SPAN_H
-#define MTTLIB_CHARACTER_SPAN_H
+#ifndef MTTLIB_CHARACTER_SPAN_H_
+#define MTTLIB_CHARACTER_SPAN_H_
+
+#include <cstdint>
 
 namespace mttlib {
   // assert(c_string != nullptr)
@@ -14,14 +16,12 @@ namespace mttlib {
   }
 
   class character_span {
-    static constexpr char FALLBACK[1]{ '\0' };
-
     char const* m_data;
     int m_size;
 
   public:
     character_span() noexcept {
-      m_data = FALLBACK;
+      m_data = nullptr;
       m_size = 0;
     }
 
@@ -31,7 +31,7 @@ namespace mttlib {
       m_size = length(c_string);
     }
 
-    // assert(characters != nullptr && count >= 0)
+    // assert(count == 0 || characters != nullptr && count > 0)
     character_span(char const* characters, int count) noexcept {
       m_data = characters;
       m_size = count;
@@ -47,7 +47,7 @@ namespace mttlib {
     }
 
     char const* end() const noexcept {
-      return m_data + m_size;
+      return m_data == nullptr ? nullptr : m_data + m_size;
     }
 
     char const* data() const noexcept {
@@ -56,6 +56,24 @@ namespace mttlib {
 
     int size() const noexcept {
       return m_size;
+    }
+
+    bool empty() const noexcept {
+      return m_size == 0;
+    }
+  };
+
+  // FNV-1a
+  struct case_sensitive_hasher_character_span {
+    std::uint64_t operator () (character_span const& value) const noexcept {
+      std::uint64_t result = 14695981039346656037ull;
+
+      for (int i = 0; i < value.size(); ++i) {
+        result = result ^ static_cast < std::uint8_t > (value[i]);
+        result = result * 1099511628211ull;
+      }
+
+      return result;
     }
   };
 }

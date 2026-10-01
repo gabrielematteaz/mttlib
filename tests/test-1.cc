@@ -1,16 +1,13 @@
 #include <print>
 
-#include "vector.h"
+#include "nothrow_string.h"
 
 int main() {
-  mttlib::vector < int > integers;
+  auto string = mttlib::nothrow_string::construct("ciao io sono");
 
-  integers.push_back(10);
-  integers.push_back(20);
-  integers.push_back(30);
-  integers.push_back(40);
-  integers.push_back(50);
-  integers.push_back(60);
+  if (string.has_value() == false) {
+    return false;
+  }
 
-  std::print("size(): {} capacity(): {}\n{}", integers.size(), integers.capacity(), integers);
+  std::print("{}", mttlib::hash < mttlib::nothrow_string > () (string.value()));
 }
