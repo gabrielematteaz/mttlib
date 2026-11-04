@@ -4,7 +4,7 @@ param (
   $config
 )
 
-$common_flags = @("/std:c++latest", "/utf-8", "/Iinclude\mttlib", "/c", "/W4")
+$common_flags = @("/std:c++latest", "/utf-8", "/Iinclude", "/c", "/W4")
 $library_name = "mttlib"
 
 switch ($config) {
@@ -25,5 +25,5 @@ $object_files = Get-ChildItem "$binary_directory*.obj" | ForEach-Object { $_.Ful
 & lib /OUT:"$binary_directory$library_name.lib" $object_files
 
 if ($config -eq "debug") {
-  & cl /std:c++latest /utf-8 /Iinclude\mttlib /Fo:$binary_directory /Fd:$binary_directory /Fe:$binary_directory /Zi /Od /MDd tests\test-1.cc bin\debug\mttlib.lib
+  & cl /std:c++latest /utf-8 /Iinclude /Fo:$binary_directory /Fd:$binary_directory /Fe:$binary_directory /Zi /Od /MDd tests\test-1.cc bin\debug\mttlib.lib
 }
